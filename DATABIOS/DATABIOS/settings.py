@@ -9,9 +9,18 @@ https://docs.djangoproject.com/en/5.0/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.0/ref/settings/
 """
-
 from pathlib import Path
 import os
+
+# Load environment variables from .env file if it exists
+try:
+    from dotenv import load_dotenv
+    # Load from repository root or current directory
+    load_dotenv(os.path.join(Path(__file__).resolve().parent.parent.parent, '.env'))
+    load_dotenv(os.path.join(Path(__file__).resolve().parent.parent, '.env'))
+except ImportError:
+    pass
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -20,12 +29,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-aj&4!^je=yes)oxi0mf9*u)p9)5++^v^#=e1b8vm0@#0xqo5k5'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-aj&4!^je=yes)oxi0mf9*u)p9)5++^v^#=e1b8vm0@#0xqo5k5')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [host.strip() for host in os.environ.get('DJANGO_ALLOWED_HOSTS', '*').split(',') if host.strip()]
 
 
 # Application definition
@@ -47,6 +56,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware', # Whitenoise for static files
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -97,16 +107,33 @@ LOGIN_URL = '/usuarios/login/'                              # added by Diego
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': 'data_bios',
-        'USER': 'gabri',
-        'PASSWORD': 'gab',
-        'HOST': 'localhost',
-        'PORT': '5432',
+try:
+    import dj_database_url
+    has_dj_database_url = True
+except ImportError:
+    has_dj_database_url = False
+
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
+if DATABASE_URL and has_dj_database_url:
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql_psycopg2',
+            'NAME': os.environ.get('DB_NAME', 'data_bios'),
+            'USER': os.environ.get('DB_USER', 'gabri'),
+            'PASSWORD': os.environ.get('DB_PASSWORD', 'gab'),
+            'HOST': os.environ.get('DB_HOST', 'localhost'),
+            'PORT': os.environ.get('DB_PORT', '5432'),
+        }
+    }
 
 
 # Password validation
@@ -149,8 +176,24 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static')
 ]
 
+# Destination for collectstatic
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+# WhiteNoise storage configuration for caching/compressing static files
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
+
+# Avoid deployment build failures due to broken static file references in CSS/JS
+WHITENOISE_MANIFEST_STRICT = False
+
 MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR,'media')
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
