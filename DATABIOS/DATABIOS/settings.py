@@ -115,25 +115,44 @@ except ImportError:
 
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
+# 1. Opción Principal: Producción / URL de Base de Datos externa
 if DATABASE_URL and has_dj_database_url:
     DATABASES = {
         'default': dj_database_url.config(
             default=DATABASE_URL,
             conn_max_age=600,
             conn_health_checks=True,
-        )
+            )
     }
 else:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql_psycopg2',
-            'NAME': os.environ.get('DB_NAME', 'data_bios'),
-            'USER': os.environ.get('DB_USER', 'gabri'),
-            'PASSWORD': os.environ.get('DB_PASSWORD', 'gab'),
-            'HOST': os.environ.get('DB_HOST', 'localhost'),
-            'PORT': os.environ.get('DB_PORT', '5432'),
+    # Obtener el Host para verificar si es local o si existe la intención de usar Postgres
+    db_host = os.environ.get('DB_HOST', 'localhost')
+    
+    # Condición: Si las variables de entorno de Postgres personalizadas existen o estás en producción local,
+    # pero si estás en Codespaces sin Postgres iniciado, forzamos el fallback a SQLite.
+    # Para entornos provisionales rápidos, si el HOST es localhost o 127.0.0.1, evaluamos usar SQLite.
+    
+    # 2. Opción Secundaria: PostgreSQL Local (Solo si no estamos en un entorno limpio de Codespaces o si se prefiere SQLite por defecto local)
+    # NOTA: Puedes cambiar esta variable 'USE_LOCAL_POSTGRES' en tus variables de entorno si deseas forzarlo.
+    if os.environ.get('USE_LOCAL_POSTGRES') == 'True' or (os.environ.get('CODESPACES') is None and db_host == 'localhost'):
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql_psycopg2',
+                'NAME': os.environ.get('DB_NAME', 'data_bios'),
+                'USER': os.environ.get('DB_USER', 'gabri'),
+                'PASSWORD': os.environ.get('DB_PASSWORD', 'gab'),
+                'HOST': db_host,
+                'PORT': os.environ.get('DB_PORT', '5432'),
+            }
         }
-    }
+    else:
+        # 3. Opción de Fallback: SQLite (Ideal para GitHub Codespaces provisionales)
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
+            }
+        }
 
 
 # Password validation
