@@ -113,28 +113,49 @@ try:
 except ImportError:
     has_dj_database_url = False
 
-DATABASE_URL = os.environ.get('DATABASE_URL')
+import socket
 
-# 1. Opción Principal: Producción / URL de Base de Datos externa
+def is_postgres_reachable(host, port):
+    if not host:
+        host = 'localhost'
+    if not port:
+        port = 5432
+    try:
+        # Try to connect with a 1-second timeout
+        with socket.create_connection((host, int(port)), timeout=1.0):
+            return True
+    except (socket.timeout, ConnectionRefusedError, OSError):
+        return False
+
+# Determine if we should use PostgreSQL or fallback to SQLite
+DATABASE_URL = os.environ.get('DATABASE_URL')
+use_postgres = False
+
 if DATABASE_URL and has_dj_database_url:
-    DATABASES = {
-        'default': dj_database_url.config(
-            default=DATABASE_URL,
-            conn_max_age=600,
-            conn_health_checks=True,
-            )
-    }
+    try:
+        parsed_db = dj_database_url.parse(DATABASE_URL)
+        db_host = parsed_db.get('HOST', 'localhost')
+        db_port = parsed_db.get('PORT', 5432)
+        if is_postgres_reachable(db_host, db_port):
+            use_postgres = True
+    except Exception:
+        pass
 else:
-    # Obtener el Host para verificar si es local o si existe la intención de usar Postgres
     db_host = os.environ.get('DB_HOST', 'localhost')
-    
-    # Condición: Si las variables de entorno de Postgres personalizadas existen o estás en producción local,
-    # pero si estás en Codespaces sin Postgres iniciado, forzamos el fallback a SQLite.
-    # Para entornos provisionales rápidos, si el HOST es localhost o 127.0.0.1, evaluamos usar SQLite.
-    
-    # 2. Opción Secundaria: PostgreSQL Local (Solo si no estamos en un entorno limpio de Codespaces o si se prefiere SQLite por defecto local)
-    # NOTA: Puedes cambiar esta variable 'USE_LOCAL_POSTGRES' en tus variables de entorno si deseas forzarlo.
-    if os.environ.get('USE_LOCAL_POSTGRES') == 'True' or (os.environ.get('CODESPACES') is None and db_host == 'localhost'):
+    db_port = os.environ.get('DB_PORT', '5432')
+    if is_postgres_reachable(db_host, db_port):
+        use_postgres = True
+
+if use_postgres:
+    if DATABASE_URL and has_dj_database_url:
+        DATABASES = {
+            'default': dj_database_url.config(
+                default=DATABASE_URL,
+                conn_max_age=600,
+                conn_health_checks=True,
+            )
+        }
+    else:
         DATABASES = {
             'default': {
                 'ENGINE': 'django.db.backends.postgresql_psycopg2',
@@ -142,17 +163,17 @@ else:
                 'USER': os.environ.get('DB_USER', 'gabri'),
                 'PASSWORD': os.environ.get('DB_PASSWORD', 'gab'),
                 'HOST': db_host,
-                'PORT': os.environ.get('DB_PORT', '5432'),
+                'PORT': db_port,
             }
         }
-    else:
-        # 3. Opción de Fallback: SQLite (Ideal para GitHub Codespaces provisionales)
-        DATABASES = {
-            'default': {
-                'ENGINE': 'django.db.backends.sqlite3',
-                'NAME': BASE_DIR / 'db.sqlite3',
-            }
+else:
+    # Fallback to SQLite (e.g. in GitHub Actions or developer environment)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
         }
+    }
 
 
 # Password validation

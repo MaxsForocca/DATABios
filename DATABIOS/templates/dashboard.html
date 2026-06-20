@@ -23,11 +23,13 @@
                 <span>Alerta inventario:</span>
                 <strong>0</strong>                <!-- INSERT VALUE -->                
             </div>
+            {#
             <div class="normal_alerts">
                 <i class="fas fa-receipt"></i>
                 <span>Ventas de hoy:</span>
                 <strong>13</strong>                <!-- INSERT VALUE -->
             </div>
+            #}
         </div>
         <div class="foot">
             <div class="top__foot__bar">
@@ -49,6 +51,7 @@
         </div>
     </div>
     <div class="right">
+        {#
         <div class="money_alerts">
             <i class="fas fa-money-bill-wave"></i>
             <span>Ingresos Brutos:</span>
@@ -59,8 +62,10 @@
             <span>Ingresos Netos:</span>
             <strong>S/. 1500.00</strong>                <!-- INSERT VALUE -->
         </div>
+        #}
     </div>
 </div>
+{#
 <div class="graphic">
     <div class="graphic_container">
         <div class="graphic__top__bar">
@@ -98,10 +103,11 @@
         </div>
     </div>
 </div>
+#}
 {% endblock %}
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="{% static 'js/char.js' %}"></script>
+{# <script src="{% static 'js/char.js' %}"></script> #}
 <script src="{% static 'js/swall/dashboard.js' %}"></script>
 {% endblock %}
